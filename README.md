@@ -5,6 +5,9 @@ Temporary file sharing at https://tmp.nolarp.space.
 - One file per upload, up to 100 MB (100,000,000 bytes).
 - Files expire 60 minutes after upload finishes. Download access ends at expiry; a sweep removes expired bytes every second while running, and on startup.
 - Random 192-bit share links. Anyone with a link can download. No public file listing.
+- Every file page shows a QR code for its share link.
+- Open **Receive QR** on the receiving device, then use **Scan receive QR** on an uploaded file's page to send it there. The receiver opens the download page automatically. You can also paste the receive link, or scan it with a phone camera and upload a new file directly to that device.
+- Receive QRs expire after 10 minutes and accept one file. Receive sessions are held in memory and expire on restart. Separate private polling tokens prevent a sender from reading another device's inbox. Sending never extends the file's original expiry.
 - Streams uploads to disk, rejects oversized streams, and removes interrupted uploads.
 - Persistent Docker volume preserves files and expiry times across restarts. Eight concurrent uploads maximum; new uploads are rejected when disk space is low.
 - Downloads are attachments, never rendered as uploaded HTML or scripts.
@@ -29,3 +32,5 @@ Use the repository's `docker-compose.yml` with Coolify's Docker Compose build pa
 ## API
 
 `POST /api/files?name=example.txt` accepts the raw file body and returns `{id, name, size, expiresAt}`. `GET /api/files/:id` returns metadata and `GET /download/:id` downloads it. Expired and unknown links return 404. `GET /health` is the container health check.
+
+`POST /api/receivers` creates `{id, readToken, expiresAt}`. Poll `GET /api/receivers/:id` with `Authorization: Bearer <readToken>`. `POST /api/receivers/:id/files/:fileId` delivers an existing, unexpired file. Camera scanning happens locally in the browser; no video is uploaded.

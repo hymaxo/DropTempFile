@@ -3,10 +3,12 @@ import { readFile, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Store, UploadError, MAX_BYTES } from './store.js';
+import { Receivers } from './receivers.js';
 
 const store = new Store(process.env.DATA_DIR || './data');
 await store.init();
-const assets = new Map(await Promise.all(['index.html', 'app.js', 'style.css'].map(async name => [name, await readFile(join('public', name))] as const)));
+const receivers = new Receivers();
+const assets = new Map(await Promise.all(['index.html', 'bundle.js', 'style.css'].map(async name => [name, await readFile(join('public', name))] as const)));
 const cleanup = setInterval(() => store.cleanup().catch(console.error), 1000);
 cleanup.unref();
 const server = createServer(async (req, res) => {
@@ -18,6 +20,16 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://localhost');
     if (req.method === 'GET' && url.pathname === '/health') return json(200, { ok: true });
+    if (req.method === 'POST' && url.pathname === '/api/receivers') return json(201, receivers.create());
+    const receive = url.pathname.match(/^\/api\/receivers\/([a-f0-9]{48})(?:\/files\/([a-f0-9]{48}))?$/);
+    if (receive) {
+      if (req.method === 'GET' && !receive[2]) return json(200, receivers.read(receive[1], String(req.headers.authorization || '').replace(/^Bearer /, '')));
+      if (req.method === 'POST' && receive[2]) {
+        if (!await store.get(receive[2])) return json(404, { error: 'This file has expired or does not exist.' });
+        receivers.send(receive[1], receive[2]);
+        return json(200, { ok: true });
+      }
+    }
     if (req.method === 'POST' && url.pathname === '/api/files') {
       if (Number(req.headers['content-length']) > MAX_BYTES) return json(413, { error: 'Files must be 100 MB or smaller.' });
       const name = url.searchParams.get('name') || 'download';
@@ -34,7 +46,7 @@ const server = createServer(async (req, res) => {
       await pipeline(file.createReadStream(), res);
       return;
     }
-    const asset = url.pathname === '/' || /^\/f\/[a-f0-9]{48}$/.test(url.pathname) ? 'index.html' : url.pathname.slice(1);
+    const asset = ['/', '/receive', '/send'].includes(url.pathname) || /^\/f\/[a-f0-9]{48}$/.test(url.pathname) ? 'index.html' : url.pathname.slice(1);
     if (req.method === 'GET' && assets.has(asset)) {
       res.writeHead(200, { 'Content-Type': asset.endsWith('.js') ? 'text/javascript' : asset.endsWith('.css') ? 'text/css' : 'text/html; charset=utf-8' });
       res.end(assets.get(asset));
