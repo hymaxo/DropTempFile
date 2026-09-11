@@ -1,0 +1,1 @@
+{"name":"drop-temp-file","private":true,"type":"module","scripts":{"build":"tsc","start":"node dist/server.js","dev":"tsx src/server.ts","test":"tsx --test src/*.test.ts"},"devDependencies":{"@types/node":"^22.0.0","tsx":"^4.20.0","typescript":"^5.9.0"}}
