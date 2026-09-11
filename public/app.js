@@ -67,6 +67,19 @@ function upload(file) {
   xhr.send(file);
 }
 el('file').addEventListener('change', e => upload(e.target.files[0]));
+document.addEventListener('paste', event => {
+  // Keep text paste available in the receive-link field and only consume real files.
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'TEXTAREA' || (target.tagName === 'INPUT' && target.type !== 'file'))) return;
+  if (el('upload-view').hidden || el('file').disabled) return;
+  const files = [...(event.clipboardData?.files || [])].filter(file => file.size > 0);
+  const text = event.clipboardData?.getData('text/plain') || '';
+  const pastedText = !files.length && /[\r\n]/.test(text) ? new File([text], 'pasted-text.txt', { type: 'text/plain;charset=utf-8' }) : null;
+  if (!files.length && !pastedText) return;
+  event.preventDefault();
+  if (files.length > 1) { el('status').textContent = 'Choose one file at a time.'; return; }
+  upload(files[0] || pastedText);
+});
 for (const type of ['dragenter', 'dragover']) el('drop').addEventListener(type, e => { e.preventDefault(); el('drop').classList.add('drag'); });
 for (const type of ['dragleave', 'drop']) el('drop').addEventListener(type, e => { e.preventDefault(); el('drop').classList.remove('drag'); });
 el('drop').addEventListener('drop', e => { if (e.dataTransfer.files.length > 1) { el('status').textContent = 'Choose one file at a time.'; return; } upload(e.dataTransfer.files[0]); });

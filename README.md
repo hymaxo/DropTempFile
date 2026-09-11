@@ -6,6 +6,7 @@ Temporary file sharing at https://tmp.nolarp.space.
 - Files expire 60 minutes after upload finishes. Download access ends at expiry; a sweep removes expired bytes every second while running, and on startup.
 - Random 192-bit share links. Anyone with a link can download. No public file listing.
 - Every file page shows a QR code for its share link.
+- On the upload page, press Ctrl + V (or ⌘ + V on macOS) to paste an image or file directly from the clipboard. Multiline clipboard text is uploaded as `pasted-text.txt`; single-line text remains untouched. Text paste remains available in link fields.
 - Open **Receive QR** on the receiving device, then use **Scan receive QR** on an uploaded file's page to send it there. The receiver opens the download page automatically. You can also paste the receive link, or scan it with a phone camera and upload a new file directly to that device.
 - Receive QRs expire after 10 minutes and accept one file. Receive sessions are held in memory and expire on restart. Separate private polling tokens prevent a sender from reading another device's inbox. Sending never extends the file's original expiry.
 - Streams uploads to disk, rejects oversized streams, and removes interrupted uploads.
