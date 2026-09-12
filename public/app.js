@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
+import './sessions.js';
 
 const el = id => document.getElementById(id);
 const maxBytes = 100_000_000;
@@ -28,7 +29,7 @@ function showFile(info, uploaded) {
   expiryTimer = setInterval(tick, 1000);
   if (pendingReceiver) { const receiver = pendingReceiver; pendingReceiver = null; sendTo(receiver); }
 }
-function showExpired(message = 'This file has expired or does not exist.') {
+function showExpired(message = 'This file expired or was removed to free storage.') {
   clearInterval(expiryTimer);
   el('upload-view').hidden = true;
   el('file-view').hidden = false;
@@ -90,7 +91,7 @@ el('copy').addEventListener('click', async () => {
 const id = location.pathname.match(/^\/f\/([a-f0-9]{48})$/)?.[1];
 if (id) {
   el('upload-view').hidden = true;
-  fetch(`/api/files/${id}`).then(async response => { if (!response.ok) { showExpired(response.status === 404 ? undefined : 'Unable to load this file. Please refresh.'); return; } showFile(await response.json(), false); }).catch(() => showExpired('Unable to connect. Please refresh.'));
+  fetch(`/api/files/${id}`).then(async response => { if (!response.ok) { showExpired(response.status === 403 ? 'Join this session from the home page to access its files.' : response.status === 404 ? undefined : 'Unable to load this file. Please refresh.'); return; } const info = await response.json(); if (info.sessionId) { location.replace(`/session/${info.sessionId}`); return; } showFile(info, false); }).catch(() => showExpired('Unable to connect. Please refresh.'));
 }
 
 async function request(path, options) {
