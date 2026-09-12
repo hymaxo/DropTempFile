@@ -53,3 +53,5 @@ Use the repository's `docker-compose.yml` with Coolify's Docker Compose build pa
 `POST /api/receivers` creates `{id, readToken, expiresAt}`. Poll `GET /api/receivers/:id` with `Authorization: Bearer <readToken>`. `POST /api/receivers/:id/files/:fileId` delivers an existing, unexpired file. Camera scanning happens locally in the browser; no video is uploaded.
 
 `POST /api/sessions` creates a session and sets its membership cookie. `POST /api/sessions/join` with JSON `{ "code": "123456" }` joins and sets the same cookie. `GET /api/sessions/:id` lists files and returns serverTime/expiresAt; `POST /api/sessions/:id/files?name=example.txt` uploads raw bytes. Keep the cookie for session downloads. Expired sessions return 410, missing membership returns 403.
+
+The interface supports English and Russian. The header language selector defaults to Auto, using the first supported browser language (English fallback). Manual choices are saved in local storage. Language changes apply immediately without restarting uploads or sessions.

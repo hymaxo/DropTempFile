@@ -1,3 +1,4 @@
+import { t, setText, locale } from './i18n.js';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './sessions.js';
@@ -8,7 +9,7 @@ let expiryTimer;
 let currentFile;
 let pendingReceiver = location.pathname === '/send' ? location.hash.slice(1) : null;
 if (pendingReceiver && !/^[a-f0-9]{48}$/.test(pendingReceiver)) pendingReceiver = null;
-if (pendingReceiver) document.querySelector('.intro').textContent = 'Choose a file to send to the receiving device.';
+if (pendingReceiver) setText(document.querySelector('.intro'), () => t('Choose a file to send to the receiving device.'));
 function showFile(info, uploaded) {
   currentFile = info;
   clearInterval(expiryTimer);
@@ -16,14 +17,14 @@ function showFile(info, uploaded) {
   el('upload-view').hidden = true;
   el('file-view').hidden = false;
   el('filename').textContent = info.name;
-  el('file-state').textContent = uploaded ? 'Ready to share' : 'Ready to download';
+  setText(el('file-state'), () => t(uploaded ? 'Ready to share' : 'Ready to download'));
   el('link').value = `${location.origin}/f/${info.id}`;
   el('download').href = `/download/${info.id}`;
   QRCode.toCanvas(el('file-qr'), el('link').value, { width: 220, margin: 4 }).catch(() => { el('file-qr').hidden = true; });
   function tick() {
     const remaining = info.expiresAt - Date.now();
     if (remaining <= 0) { showExpired(); return; }
-    el('details').textContent = `${(info.size / 1_000_000).toLocaleString(undefined, {maximumFractionDigits:2})} MB · Expires in ${Math.ceil(remaining / 60000)} min`;
+    setText(el('details'), () => t('{0} MB · Expires in {1} min', [(info.size / 1_000_000).toLocaleString(locale(), {maximumFractionDigits:2}), Math.ceil(remaining / 60000)]));
   }
   tick();
   expiryTimer = setInterval(tick, 1000);
@@ -33,9 +34,9 @@ function showExpired(message = 'This file expired or was removed to free storage
   clearInterval(expiryTimer);
   el('upload-view').hidden = true;
   el('file-view').hidden = false;
-  el('file-state').textContent = 'File unavailable';
-  el('filename').textContent = 'Gone.';
-  el('details').textContent = message;
+  setText(el('file-state'), () => t('File unavailable'));
+  setText(el('filename'), () => t('Gone.'));
+  setText(el('details'), () => t(message));
   el('share').hidden = true;
   el('download').hidden = true;
   el('send-tools').hidden = true;
@@ -45,17 +46,17 @@ function showExpired(message = 'This file expired or was removed to free storage
 function upload(file) {
   if (!file || el('file').disabled) return;
   el('status').className = '';
-  if (file.size > maxBytes) { el('status').textContent = 'Files must be 100 MB or smaller.'; el('status').className = 'error'; el('file').value = ''; return; }
+  if (file.size > maxBytes) { setText(el('status'), () => t('Files must be 100 MB or smaller.')); el('status').className = 'error'; el('file').value = ''; return; }
   el('file').disabled = true;
   el('progress').hidden = false;
   el('progress').value = 0;
-  el('status').textContent = `Uploading ${file.name}…`;
+  setText(el('status'), () => t("Uploading {0}…", [file.name]));
   const xhr = new XMLHttpRequest();
   xhr.open('POST', `/api/files?name=${encodeURIComponent(file.name)}`);
   xhr.setRequestHeader('Content-Type', 'application/octet-stream');
   xhr.timeout = 120000;
   xhr.upload.onprogress = e => { if (e.lengthComputable) el('progress').value = e.loaded / e.total * 100; };
-  function fail(message) { el('file').disabled = false; el('file').value = ''; el('progress').hidden = true; el('status').className = 'error'; el('status').textContent = message; }
+  function fail(message) { el('file').disabled = false; el('file').value = ''; el('progress').hidden = true; el('status').className = 'error'; setText(el('status'), () => t(message)); }
   xhr.onload = () => {
     let data;
     try { data = JSON.parse(xhr.responseText); } catch { fail('Upload failed. Please try again.'); return; }
@@ -78,15 +79,15 @@ document.addEventListener('paste', event => {
   const pastedText = !files.length && /[\r\n]/.test(text) ? new File([text], 'pasted-text.txt', { type: 'text/plain;charset=utf-8' }) : null;
   if (!files.length && !pastedText) return;
   event.preventDefault();
-  if (files.length > 1) { el('status').textContent = 'Choose one file at a time.'; return; }
+  if (files.length > 1) { setText(el('status'), () => t('Choose one file at a time.')); return; }
   upload(files[0] || pastedText);
 });
 for (const type of ['dragenter', 'dragover']) el('drop').addEventListener(type, e => { e.preventDefault(); el('drop').classList.add('drag'); });
 for (const type of ['dragleave', 'drop']) el('drop').addEventListener(type, e => { e.preventDefault(); el('drop').classList.remove('drag'); });
-el('drop').addEventListener('drop', e => { if (e.dataTransfer.files.length > 1) { el('status').textContent = 'Choose one file at a time.'; return; } upload(e.dataTransfer.files[0]); });
+el('drop').addEventListener('drop', e => { if (e.dataTransfer.files.length > 1) { setText(el('status'), () => t('Choose one file at a time.')); return; } upload(e.dataTransfer.files[0]); });
 el('copy').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(el('link').value); el('copy-status').textContent = 'Link copied.'; }
-  catch { el('link').select(); el('copy-status').textContent = 'Select and copy the link above.'; }
+  try { await navigator.clipboard.writeText(el('link').value); setText(el('copy-status'), () => t('Link copied.')); }
+  catch { el('link').select(); setText(el('copy-status'), () => t('Select and copy the link above.')); }
 });
 const id = location.pathname.match(/^\/f\/([a-f0-9]{48})$/)?.[1];
 if (id) {
@@ -109,18 +110,18 @@ let sending = false;
 async function sendTo(receiver) {
   if (!currentFile || sending) return;
   sending = true;
-  el('send-status').textContent = 'Sending…';
+  setText(el('send-status'), () => t('Sending…'));
   el('send-status').className = '';
   try {
     await request(`/api/receivers/${receiver}/files/${currentFile.id}`, { method: 'POST' });
-    el('send-status').textContent = 'Sent. Your file is ready on the receiving device.';
-  } catch (error) { el('send-status').textContent = error.message; el('send-status').className = 'error'; }
+    setText(el('send-status'), () => t('Sent. Your file is ready on the receiving device.'));
+  } catch (error) { setText(el('send-status'), () => t(error.message)); el('send-status').className = 'error'; }
   finally { sending = false; }
 }
 el('send-form').addEventListener('submit', e => {
   e.preventDefault();
   try { sendTo(receiverFrom(el('receiver-link').value)); }
-  catch (error) { el('send-status').textContent = error.message; }
+  catch (error) { setText(el('send-status'), () => t(error.message)); }
 });
 
 let cameraStream;
@@ -138,7 +139,7 @@ el('close-scanner').addEventListener('click', stopCamera);
 el('scanner').addEventListener('cancel', stopCamera);
 el('scan').addEventListener('click', async () => {
   el('scanner').showModal();
-  el('scan-status').textContent = 'Opening camera…';
+  setText(el('scan-status'), () => t('Opening camera…'));
   const generation = ++cameraGeneration;
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera unavailable. Close this window and paste a receive link instead.');
@@ -147,7 +148,7 @@ el('scan').addEventListener('click', async () => {
     cameraStream = stream;
     el('camera').srcObject = stream;
     await el('camera').play();
-    el('scan-status').textContent = 'Point your camera at the other device’s receive QR.';
+    setText(el('scan-status'), () => t('Point your camera at the other device’s receive QR.'));
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d', { willReadFrequently: true });
     // Decode at four frames per second only while the scanner is visible.
@@ -162,7 +163,7 @@ el('scan').addEventListener('click', async () => {
         const code = jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: 'dontInvert' });
         if (code) {
           try { const receiver = receiverFrom(code.data); stopCamera(); sendTo(receiver); return; }
-          catch (error) { el('scan-status').textContent = error.message; }
+          catch (error) { setText(el('scan-status'), () => t(error.message)); }
         }
       }
       scanTimer = setTimeout(scan, 250);
@@ -172,7 +173,7 @@ el('scan').addEventListener('click', async () => {
     if (generation !== cameraGeneration) return;
     cameraStream?.getTracks().forEach(track => track.stop());
     cameraStream = null;
-    el('scan-status').textContent = error.name === 'NotAllowedError' ? 'Camera permission denied. Allow camera access, or close and paste a receive link.' : error.message;
+    setText(el('scan-status'), () => t(error.name === 'NotAllowedError' ? 'Camera permission denied. Allow camera access, or close and paste a receive link.' : error.message));
   }
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopCamera(); });
@@ -188,7 +189,7 @@ async function startReceiver() {
   el('receive-qr').hidden = true;
   el('new-receiver').hidden = true;
   el('receive-link-details').hidden = true;
-  el('receive-status').textContent = 'Creating receive QR…';
+  setText(el('receive-status'), () => t('Creating receive QR…'));
   try {
     const session = await request('/api/receivers', { method: 'POST' });
     const link = `${location.origin}/send#${session.id}`;
@@ -209,8 +210,8 @@ async function startReceiver() {
           location.assign(`/f/${state.fileId}`);
           return;
         }
-        el('receive-status').textContent = `Waiting for a file · QR expires in ${Math.ceil((session.expiresAt - Date.now()) / 60000)} min`;
-      } catch { el('receive-status').textContent = 'Connection lost. Reconnecting…'; }
+        setText(el('receive-status'), () => t("Waiting for a file · QR expires in {0} min", [Math.ceil((session.expiresAt - Date.now()) / 60000)]));
+      } catch { setText(el('receive-status'), () => t('Connection lost. Reconnecting…')); }
       receiveTimer = setTimeout(poll, 2000);
     }
     poll();
@@ -218,14 +219,14 @@ async function startReceiver() {
 }
 function expireReceiver(message = 'Receive QR expired. Generate a new one.') {
   clearTimeout(receiveTimer);
-  el('receive-status').textContent = message;
+  setText(el('receive-status'), () => t(message));
   el('receive-qr').hidden = true;
   el('receive-link-details').hidden = true;
   el('new-receiver').hidden = false;
 }
 el('new-receiver').addEventListener('click', startReceiver);
 el('copy-receive').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(el('receive-link').value); el('copy-receive').textContent = 'Copied'; }
+  try { await navigator.clipboard.writeText(el('receive-link').value); setText(el('copy-receive'), () => t('Copied')); }
   catch { el('receive-link').select(); }
 });
 if (location.pathname === '/receive') startReceiver();

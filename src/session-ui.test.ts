@@ -1,3 +1,4 @@
+import { buildSync } from 'esbuild';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -6,7 +7,7 @@ import { SESSION_TTL } from './store.js';
 
 test('folder renders safe names, warns at ten minutes, and closes all file actions at expiry', async () => {
   const html = await readFile('public/index.html', 'utf8');
-  const script = await readFile('public/sessions.js', 'utf8');
+  const script = buildSync({ entryPoints: ['public/sessions.js'], bundle: true, write: false, format: 'iife' }).outputFiles[0].text;
   const id = 'a'.repeat(48);
   const dom = new JSDOM(html, { url: `https://tmp.nolarp.space/session/${id}`, runScripts: 'outside-only' });
   let now = 1_000_000;
@@ -24,6 +25,15 @@ test('folder renders safe names, warns at ten minutes, and closes all file actio
     assert.equal(doc.querySelector('#session-files img'), null);
     assert.match(doc.getElementById('session-files')!.textContent!, /<img/);
     assert.equal(doc.getElementById('session-warning')!.hidden, true);
+    const language = doc.getElementById('language') as HTMLSelectElement;
+    language.value = 'ru';
+    language.dispatchEvent(new dom.window.Event('change'));
+    assert.equal(doc.querySelector('#session-files a')!.textContent, 'Скачать ↓');
+    assert.match(doc.querySelector('.session-file-name')!.textContent!, /<img/);
+    assert.equal(doc.getElementById('session-code')!.textContent, '001234');
+    language.value = 'en';
+    language.dispatchEvent(new dom.window.Event('change'));
+    assert.equal(doc.querySelector('#session-files a')!.textContent, 'Download ↓');
     now = expiresAt - 600_000; tick();
     assert.equal(doc.getElementById('session-warning')!.hidden, false);
     assert.equal(doc.getElementById('session-warning-counter')!.textContent, '00:10:00');
